@@ -24,6 +24,7 @@
     "appId": "com.cachaapp.tienda",
     "productName": "Cacha App",
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "portable",
