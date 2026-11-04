@@ -6,44 +6,38 @@ const Database = require("better-sqlite3");
 const db = new Database(path.join(app.getPath("userData"), "cacha_app.db"));
 
 // Crear tablas (incluyendo detalle_ventas para el carrito)
+// Crear tablas
 db.exec(`
-  CREATE TABLE IF NOT EXISTS productos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL,
-    precio REAL NOT NULL,
-    stock INTEGER NOT NULL,
-    fecha_vencimiento TEXT
-  );
-  CREATE TABLE IF NOT EXISTS ventas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fecha TEXT DEFAULT CURRENT_TIMESTAMP,
-    total REAL NOT NULL,
-    metodo_pago TEXT NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS detalle_ventas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    venta_id INTEGER,
-    producto_id INTEGER,
-    cantidad INTEGER,
-    precio_unitario REAL,
-    FOREIGN KEY(venta_id) REFERENCES ventas(id),
-    FOREIGN KEY(producto_id) REFERENCES productos(id)
-  );
-  CREATE TABLE IF NOT EXISTS fiados (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cliente TEXT NOT NULL,
-    monto REAL NOT NULL,
-    fecha TEXT DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS caja (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fecha TEXT DEFAULT CURRENT_TIMESTAMP,
-    descripcion TEXT NOT NULL,
-    tipo TEXT NOT NULL,
-    monto REAL NOT NULL,
-    metodo TEXT NOT NULL
-  );
-`);
+    CREATE TABLE IF NOT EXISTS productos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL, precio REAL NOT NULL, stock INTEGER NOT NULL, fecha_vencimiento TEXT
+    );
+    CREATE TABLE IF NOT EXISTS ventas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT DEFAULT CURRENT_TIMESTAMP, total REAL NOT NULL, metodo_pago TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS fiados (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, cliente TEXT NOT NULL, monto REAL NOT NULL, fecha TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS caja (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT DEFAULT CURRENT_TIMESTAMP, descripcion TEXT NOT NULL, tipo TEXT NOT NULL, monto REAL NOT NULL, metodo TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS detalle_ventas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, venta_id INTEGER, producto_id INTEGER, nombre_producto TEXT, cantidad INTEGER, precio_unitario REAL
+    );
+  `);
+
+// --- MIGRACIÓN AUTOMÁTICA ---
+// Si la tabla detalle_ventas ya existía sin la columna 'nombre_producto', se la agregamos
+try {
+  db.exec("ALTER TABLE detalle_ventas ADD COLUMN nombre_producto TEXT");
+  // Actualizar las ventas viejas que no tengan el nombre guardado
+  db.exec(`
+      UPDATE detalle_ventas 
+      SET nombre_producto = (SELECT nombre FROM productos WHERE productos.id = detalle_ventas.producto_id)
+      WHERE nombre_producto IS NULL
+    `);
+} catch (error) {
+  // Si la columna ya existe, ignorará el error (es normal)
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -88,24 +82,30 @@ ipcMain.handle("add-producto", (e, prod) => {
 
 // TRANSACCIÓN DE VENTA: Guarda venta, detalles y resta stock
 ipcMain.handle("procesar-venta", (e, ventaData) => {
+  // Agregamos 'nombre_producto' al INSERT
   const insertVenta = db.prepare(
     "INSERT INTO ventas (total, metodo_pago) VALUES (?, ?)",
   );
   const insertDetalle = db.prepare(
-    "INSERT INTO detalle_ventas (venta_id, producto_id, cantidad, precio_unitario) VALUES (?, ?, ?, ?)",
+    "INSERT INTO detalle_ventas (venta_id, producto_id, nombre_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?, ?)",
   );
   const updateStock = db.prepare(
     "UPDATE productos SET stock = stock - ? WHERE id = ?",
   );
 
   const ejecutarVenta = db.transaction((datos) => {
-    // 1. Guardar la venta general
     const infoVenta = insertVenta.run(datos.total, datos.metodo_pago);
     const ventaId = infoVenta.lastInsertRowid;
 
-    // 2. Guardar el detalle y descontar stock
     for (const item of datos.items) {
-      insertDetalle.run(ventaId, item.id, item.cantidad, item.precio);
+      // Guardamos item.id, item.nombre (que viene del carrito), etc.
+      insertDetalle.run(
+        ventaId,
+        item.id,
+        item.nombre,
+        item.cantidad,
+        item.precio,
+      );
       updateStock.run(item.cantidad, item.id);
     }
   });
@@ -123,8 +123,15 @@ ipcMain.handle("get-fiados", () =>
   db.prepare("SELECT * FROM fiados ORDER BY fecha DESC").all(),
 );
 ipcMain.handle("add-fiado", (e, fiado) => {
-  const stmt = db.prepare("INSERT INTO fiados (cliente, monto) VALUES (?, ?)");
-  return stmt.run(fiado.cliente, fiado.monto);
+  try {
+    const stmt = db.prepare(
+      "INSERT INTO fiados (cliente, monto) VALUES (?, ?)",
+    );
+    return stmt.run(fiado.cliente, fiado.monto);
+  } catch (error) {
+    console.error("Error en DB fiados:", error);
+    throw error; // Esto enviará el error al frontend
+  }
 });
 
 ipcMain.handle("get-caja", () =>
@@ -141,10 +148,9 @@ ipcMain.handle("add-movimiento-caja", (e, mov) => {
 ipcMain.handle("get-historial-ventas", () => {
   const query = `
     SELECT v.id as venta_id, v.fecha, v.total, v.metodo_pago, 
-           GROUP_CONCAT(COALESCE(p.nombre, 'Prod. Eliminado') || ' (x' || dv.cantidad || ')', ', ') as productos_vendidos
+           GROUP_CONCAT(dv.nombre_producto || ' (x' || dv.cantidad || ')', ', ') as productos_vendidos
     FROM ventas v
     LEFT JOIN detalle_ventas dv ON v.id = dv.venta_id
-    LEFT JOIN productos p ON dv.producto_id = p.id
     GROUP BY v.id
     ORDER BY v.fecha DESC
   `;
@@ -180,14 +186,13 @@ ipcMain.handle("update-producto", (e, prod) => {
 // Eliminar un producto
 ipcMain.handle("delete-producto", (e, id) => {
   try {
-    // 1. Desvincular el producto de las ventas pasadas (poner producto_id en NULL)
-    // Esto evita el error de FOREIGN KEY y mantiene la venta en el historial.
-    const updateDetalles = db.prepare(
+    // Desvincular el ID para que SQLite no bloquee el borrado,
+    // pero el nombre ya está a salvo en detalle_ventas.
+    db.prepare(
       "UPDATE detalle_ventas SET producto_id = NULL WHERE producto_id = ?",
-    );
-    updateDetalles.run(id);
+    ).run(id);
 
-    // 2. Ahora sí, eliminar el producto del inventario
+    // Eliminar producto
     const stmt = db.prepare("DELETE FROM productos WHERE id = ?");
     return stmt.run(id);
   } catch (error) {
@@ -199,13 +204,9 @@ ipcMain.handle("delete-producto", (e, id) => {
 // Obtener el detalle exacto de una venta
 ipcMain.handle("get-venta-detalle", (e, ventaId) => {
   const query = `
-    SELECT COALESCE(p.nombre, 'Producto Eliminado') as nombre, 
-           dv.cantidad, 
-           dv.precio_unitario, 
-           (dv.cantidad * dv.precio_unitario) as subtotal
-    FROM detalle_ventas dv
-    LEFT JOIN productos p ON dv.producto_id = p.id
-    WHERE dv.venta_id = ?
+    SELECT nombre_producto as nombre, cantidad, precio_unitario, (cantidad * precio_unitario) as subtotal
+    FROM detalle_ventas
+    WHERE venta_id = ?
   `;
   return db.prepare(query).all(ventaId);
 });

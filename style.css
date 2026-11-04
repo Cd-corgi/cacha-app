@@ -273,32 +273,67 @@ button:active {
 }
 
 /* --- FILTROS --- */
+/* --- FILTROS RESPONSIVE --- */
 .barra-filtros {
   display: flex;
-  gap: 20px;
+  flex-wrap: wrap; /* LA CLAVE: Permite que los elementos bajen a la siguiente línea */
+  gap: 15px;
   background: var(--surface);
-  padding: 15px 25px;
+  padding: 15px 20px;
   border-radius: 12px;
   margin-bottom: 20px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
   align-items: center;
   border: 1px solid var(--border);
 }
+
 .filtro-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex: 1 1 auto; /* Permite que crezcan o se encojan según el espacio */
+  min-width: 200px; /* Evita que se aplasten demasiado antes de saltar de línea */
 }
+
 .filtro-item label {
   font-weight: 600;
   font-size: 14px;
   color: var(--text-light);
+  white-space: nowrap; /* Evita que el texto del label se rompa en dos líneas */
 }
-.filtro-item select {
+
+/* Ajuste para todos los inputs y selects dentro de los filtros */
+.filtro-item select,
+.filtro-item input[type="date"] {
   padding: 8px 12px;
   font-size: 14px;
-  width: auto;
-  border-width: 1px;
+  width: 100%; /* Ocupa el espacio disponible de su contenedor */
+  max-width: 250px; /* No se estira infinitamente en pantallas grandes */
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background-color: #fafbfc;
+  transition: all 0.2s ease;
+}
+
+.filtro-item select:focus,
+.filtro-item input[type="date"]:focus {
+  outline: none;
+  border-color: var(--primary);
+  background-color: var(--surface);
+  box-shadow: 0 0 0 4px rgba(41, 128, 185, 0.1);
+}
+
+/* Ajuste especial para pantallas muy pequeñas (Tablets o ventanas reducidas) */
+@media (max-width: 768px) {
+  .filtro-item {
+    flex-direction: column; /* Pone el label arriba y el input abajo */
+    align-items: flex-start;
+    width: 100%;
+  }
+  .filtro-item select,
+  .filtro-item input[type="date"] {
+    max-width: 100%; /* Ocupa todo el ancho en móviles/ventanas pequeñas */
+  }
 }
 
 /* --- TABLAS --- */
@@ -555,4 +590,14 @@ tbody tr:nth-child(even) {
 #tabla-detalle-venta td {
   padding: 10px;
   font-size: 14px;
+}
+
+/* Ajuste para los inputs de fecha en los filtros */
+.filtro-item input[type="date"] {
+  padding: 8px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  width: auto;
+  background-color: white;
 }

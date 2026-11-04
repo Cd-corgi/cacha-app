@@ -45,6 +45,34 @@ async function cargarProductosSelect() {
   });
 }
 
+async function agregarFiado() {
+  const cliente = document.getElementById("fiado-cliente").value.trim();
+  const montoInput = document.getElementById("fiado-monto").value;
+  const monto = parseFloat(montoInput);
+
+  // Validación estricta
+  if (!cliente || isNaN(monto) || monto <= 0) {
+    return alert(
+      "⚠️ Por favor, ingrese un nombre válido y un monto mayor a 0.",
+    );
+  }
+
+  try {
+    // Intentar guardar en la base de datos
+    await window.api.addFiado({ cliente, monto });
+
+    // Si funciona, limpiamos y recargamos
+    alert("✅ Fiado registrado correctamente.");
+    document.getElementById("fiado-cliente").value = "";
+    document.getElementById("fiado-monto").value = "";
+    cargarFiados();
+  } catch (error) {
+    // Si falla, mostramos el error en pantalla
+    console.error("Error al guardar fiado:", error);
+    alert("❌ Error al guardar el fiado: " + error.message);
+  }
+}
+
 function agregarAlCarrito() {
   const select = document.getElementById("venta-producto");
   const cantidadInput = document.getElementById("venta-cantidad");
@@ -571,24 +599,43 @@ function renderHistorial() {
 
   const filtroMetodo = document.getElementById("filtro-metodo").value;
   const ordenFecha = document.getElementById("orden-fecha").value;
+  const fechaDesdeVal = document.getElementById("filtro-fecha-desde").value;
+  const fechaHastaVal = document.getElementById("filtro-fecha-hasta").value;
 
   let ventasAMostrar = [...historialGlobal];
 
+  // 1. Filtrar por Método de Pago
   if (filtroMetodo !== "Todos") {
     ventasAMostrar = ventasAMostrar.filter(
       (v) => v.metodo_pago === filtroMetodo,
     );
   }
 
+  // 2. Filtrar por Rango de Fechas
+  if (fechaDesdeVal) {
+    const fechaDesde = new Date(fechaDesdeVal + "T00:00:00"); // Inicio del día
+    ventasAMostrar = ventasAMostrar.filter(
+      (v) => new Date(v.fecha + "Z") >= fechaDesde,
+    );
+  }
+  if (fechaHastaVal) {
+    const fechaHasta = new Date(fechaHastaVal + "T23:59:59"); // Fin del día
+    ventasAMostrar = ventasAMostrar.filter(
+      (v) => new Date(v.fecha + "Z") <= fechaHasta,
+    );
+  }
+
+  // 3. Ordenar por Fecha (Ascendente o Descendente)
   ventasAMostrar.sort((a, b) => {
     let fechaA = new Date(a.fecha + "Z");
     let fechaB = new Date(b.fecha + "Z");
     return ordenFecha === "desc" ? fechaB - fechaA : fechaA - fechaB;
   });
 
+  // 4. Dibujar la tabla
   if (ventasAMostrar.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="5" style="text-align:center;">No hay ventas que coincidan con los filtros.</td></tr>';
+      '<tr><td colspan="5" style="text-align:center;">No hay ventas que coincidan con los filtros seleccionados.</td></tr>';
     return;
   }
 
@@ -602,7 +649,6 @@ function renderHistorial() {
       minute: "2-digit",
     });
 
-    // AÑADIMOS EL EVENTO ONCLICK A LA FILA (TR)
     tbody.innerHTML += `<tr onclick="abrirDetalleVenta(${v.venta_id}, '${v.fecha}', '${v.metodo_pago}', ${v.total})">
             <td><strong>#${v.venta_id}</strong></td>
             <td>${fechaFormateada}</td>

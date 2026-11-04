@@ -118,8 +118,8 @@
                     </div>
                     <div class="acciones-venta">
                         <button class="btn-add" onclick="agregarAlCarrito()">➕ Añadir a la lista</button>
-                        <button class="btn-voz-busqueda" id="btn-voz-busqueda" onclick="buscarProductoPorVoz()">🎤
-                            Buscar por voz</button>
+                        <!-- <button class="btn-voz-busqueda" id="btn-voz-busqueda" onclick="buscarProductoPorVoz()">🎤
+                            Buscar por voz</button> -->
                     </div>
                 </div>
 
@@ -315,6 +315,14 @@
                         <option value="desc">Más recientes primero</option>
                         <option value="asc">Más antiguos primero</option>
                     </select>
+                    <div class="filtro-item">
+                        <label>Desde:</label>
+                        <input type="date" id="filtro-fecha-desde" onchange="renderHistorial()">
+                    </div>
+                    <div class="filtro-item">
+                        <label>Hasta:</label>
+                        <input type="date" id="filtro-fecha-hasta" onchange="renderHistorial()">
+                    </div>
                 </div>
             </div>
 
