@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Cacha App - Control de Tienda</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <h1>🏪 Cacha App</h1>
+        <p>Sistema de control para tienda de barrio</p>
+    </header>
+
+    <nav>
+        <button class="nav-btn active" onclick="showTab('ventas', this)">🛒 Registrar Venta</button>
+        <button class="nav-btn" onclick="showTab('inventario', this)">📦 Inventario</button>
+        <button class="nav-btn" onclick="showTab('fiados', this)">📒 Fiados</button>
+        <button class="nav-btn" onclick="showTab('caja', this)">💵 Caja y Pérdidas</button>
+        <button class="nav-btn" onclick="showTab('historial', this)">📊 Historial</button>
+    </nav>
+
+    <main>
+        <!-- MODAL -->
+        <div id="modal-fiado" class="modal-overlay">
+            <div class="modal-contenido">
+                <h3 id="modal-titulo">Modificar Deuda</h3>
+                <p id="modal-subtitulo"></p>
+                <input type="number" id="modal-input-monto" placeholder="Ingrese el monto ($)" autofocus>
+
+                <div class="modal-botones">
+                    <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+                    <button class="btn-primario" onclick="confirmarModificacionFiado()">Aceptar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL PARA EDITAR PRODUCTOS -->
+        <div id="modal-producto" class="modal-overlay">
+            <div class="modal-contenido" style="width: 400px; text-align: left;">
+                <h3 style="text-align: center; margin-bottom: 20px;">✏️ Editar Producto</h3>
+
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Nombre:</label>
+                    <input type="text" id="edit-prod-nombre">
+                </div>
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Precio ($):</label>
+                    <input type="number" id="edit-prod-precio">
+                </div>
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Stock (Cantidad):</label>
+                    <input type="number" id="edit-prod-stock">
+                </div>
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label>Fecha de Vencimiento:</label>
+                    <input type="date" id="edit-prod-fecha">
+                </div>
+
+                <div class="modal-botones">
+                    <button class="btn-cancelar" onclick="cerrarModalProducto()">Cancelar</button>
+                    <button class="btn-primario" onclick="guardarEdicionProducto()">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DETALLE VENTA -->
+        <div id="modal-detalle-venta" class="modal-overlay">
+            <div class="modal-contenido" style="width: 500px; text-align: left;">
+                <h3 id="detalle-venta-titulo" style="text-align: center; margin-bottom: 5px;">Detalle de Venta</h3>
+                <p id="detalle-venta-fecha"
+                    style="text-align: center; color: var(--text-light); margin-bottom: 15px; font-size: 13px;"></p>
+
+                <table id="tabla-detalle-venta" style="margin-bottom: 15px;">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Cant.</th>
+                            <th>Precio U.</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-top: 15px; border-top: 2px solid var(--border);">
+                    <div>
+                        <strong>Método:</strong> <span id="detalle-venta-metodo" class="badge-pago"></span>
+                    </div>
+                    <div style="font-size: 20px; font-weight: bold; color: var(--success);">
+                        Total: <span id="detalle-venta-total"></span>
+                    </div>
+                </div>
+
+                <div class="modal-botones">
+                    <button class="btn-primario" onclick="cerrarModalDetalleVenta()">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN: VENTAS -->
+        <section id="ventas" class="tab active">
+            <div class="panel-venta">
+                <div class="form-venta">
+                    <h2>Agregar Producto a la Venta</h2>
+                    <div class="input-group buscador-container">
+                        <label>Producto (Escriba para buscar):</label>
+                        <input type="text" id="venta-producto-input" placeholder="Ej: Escriba 'leche'..."
+                            autocomplete="off">
+                        <!-- Aquí se inyectará la lista estética -->
+                        <ul id="lista-resultados" class="lista-resultados-oculta"></ul>
+                    </div>
+                    <div class="input-group">
+                        <label>Cantidad:</label>
+                        <input type="number" id="venta-cantidad" value="1" min="1">
+                    </div>
+                    <div class="acciones-venta">
+                        <button class="btn-add" onclick="agregarAlCarrito()">➕ Añadir a la lista</button>
+                        <button class="btn-voz-busqueda" id="btn-voz-busqueda" onclick="buscarProductoPorVoz()">🎤
+                            Buscar por voz</button>
+                    </div>
+                </div>
+
+                <div class="carrito-container">
+                    <h2>Productos en esta venta</h2>
+                    <table id="tabla-carrito">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Cant.</th>
+                                <th>Precio</th>
+                                <th>Subtotal</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <h3 id="total-venta">Total: $0</h3>
+                </div>
+            </div>
+
+            <div class="cobro-container">
+                <div class="input-group">
+                    <label>Método de Pago:</label>
+                    <select id="venta-metodo">
+                        <option value="Efectivo">💵 Efectivo</option>
+                        <option value="Nequi">📱 Nequi</option>
+                        <option value="Daviplata">📱 Daviplata</option>
+                        <option value="Transferencia">🏦 Transferencia</option>
+                    </select>
+                </div>
+                <button class="btn-cobrar" onclick="finalizarVenta()">✅ COBRAR Y REGISTRAR VENTA</button>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: INVENTARIO -->
+        <section id="inventario" class="tab">
+            <div class="card">
+                <h2>Añadir Producto Nuevo</h2>
+                <div class="form-grid">
+                    <input type="text" id="prod-nombre" placeholder="Nombre (Ej: Pan tajado)">
+                    <input type="number" id="prod-precio" placeholder="Precio ($)">
+                    <input type="number" id="prod-stock" placeholder="Cantidad en stock">
+                    <div>
+                        <label style="font-size:12px">Vence (Opcional):</label>
+                        <input type="date" id="prod-fecha">
+                    </div>
+                </div>
+                <button class="btn-primario" onclick="agregarProducto()">Guardar Producto</button>
+            </div>
+
+            <h2>Inventario Actual</h2>
+
+            <!-- BARRA DE FILTROS -->
+            <div class="barra-filtros">
+                <div class="filtro-item">
+                    <label>Organizar por:</label>
+                    <select id="orden-inventario" onchange="renderInventario()">
+                        <option value="fifo">Vencimiento (FIFO - Próximos a vencer)</option>
+                        <option value="nombre">Nombre (A-Z)</option>
+                        <option value="stock-asc">Menor cantidad en stock</option>
+                        <option value="stock-desc">Mayor cantidad en stock</option>
+                    </select>
+                </div>
+            </div>
+
+            <table id="tabla-inventario">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Precio</th>
+                        <th>Stock Restante</th>
+                        <th>Fecha Vencimiento</th>
+                        <th>Controles</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+
+        <!-- SECCIÓN: FIADOS -->
+        <section id="fiados" class="tab">
+            <div class="card">
+                <h2>Registrar Nuevo Fiado</h2>
+                <div class="form-grid">
+                    <input type="text" id="fiado-cliente" placeholder="Nombre del cliente">
+                    <input type="number" id="fiado-monto" placeholder="Monto a fiar ($)">
+                </div>
+                <button class="btn-primario" onclick="agregarFiado()">Anotar Fiado</button>
+                <p class="nota">⚠️ Recuerde el tope recomendado de $40.000 a $100.000.</p>
+            </div>
+
+            <h2>Deudas Pendientes</h2>
+            <table id="tabla-fiados">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Monto Deuda</th>
+                        <th>Fecha</th>
+                        <th style="text-align: right;">Acciones</th> <!-- Nueva columna -->
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+
+        <!-- SECCIÓN: CAJA -->
+        <!-- SECCIÓN: CAJA -->
+        <section id="caja" class="tab">
+            <div class="card">
+                <h2>Registrar Movimiento de Caja o Pérdida</h2>
+                <div class="form-grid">
+                    <select id="caja-tipo">
+                        <option value="Ingreso">Ingreso Extra</option>
+                        <option value="Perdida">Pérdida (Vencido/Estafa)</option>
+                    </select>
+                    <input type="text" id="caja-desc" placeholder="Descripción (Ej: Leche vencida)">
+                    <input type="number" id="caja-monto" placeholder="Monto ($)">
+                    <select id="caja-metodo">
+                        <option value="Efectivo">💵 Efectivo</option>
+                        <option value="Nequi">📱 Nequi</option>
+                        <option value="Daviplata">📱 Daviplata</option>
+                        <option value="Transferencia">🏦 Transferencia</option>
+                    </select>
+                </div>
+                <button class="btn-primario" onclick="agregarCaja()">Registrar Movimiento</button>
+            </div>
+
+            <h2>Historial de Caja y Pérdidas</h2>
+
+            <!-- BARRA DE FILTROS -->
+            <div class="barra-filtros">
+                <div class="filtro-item">
+                    <label>Tipo:</label>
+                    <select id="filtro-tipo-caja" onchange="renderCaja()">
+                        <option value="Todos">Todos los movimientos</option>
+                        <option value="Ingreso">🟢 Solo Ingresos</option>
+                        <option value="Perdida">🔴 Solo Pérdidas</option>
+                    </select>
+                </div>
+                <div class="filtro-item">
+                    <label>Método:</label>
+                    <select id="filtro-metodo-caja" onchange="renderCaja()">
+                        <option value="Todos">Todos los métodos</option>
+                        <option value="Efectivo">💵 Efectivo</option>
+                        <option value="Nequi">📱 Nequi</option>
+                        <option value="Daviplata">📱 Daviplata</option>
+                        <option value="Transferencia">🏦 Transferencia</option>
+                    </select>
+                </div>
+                <div class="filtro-item">
+                    <label>Fecha:</label>
+                    <select id="orden-fecha-caja" onchange="renderCaja()">
+                        <option value="desc">Más recientes primero</option>
+                        <option value="asc">Más antiguos primero</option>
+                    </select>
+                </div>
+            </div>
+
+            <table id="tabla-caja">
+                <thead>
+                    <tr>
+                        <th>Fecha y Hora</th>
+                        <th>Descripción</th>
+                        <th>Tipo</th>
+                        <th>Método</th>
+                        <th>Monto</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+
+        <!-- SECCIÓN: HISTORIAL DE VENTAS -->
+        <section id="historial" class="tab">
+            <h2>Historial de Ventas</h2>
+
+            <!-- BARRA DE FILTROS -->
+            <div class="barra-filtros">
+                <div class="filtro-item">
+                    <label>Método de Pago:</label>
+                    <select id="filtro-metodo" onchange="renderHistorial()">
+                        <option value="Todos">Todos los métodos</option>
+                        <option value="Efectivo">💵 Efectivo</option>
+                        <option value="Nequi">📱 Nequi</option>
+                        <option value="Daviplata">📱 Daviplata</option>
+                        <option value="Transferencia">🏦 Transferencia</option>
+                    </select>
+                </div>
+                <div class="filtro-item">
+                    <label>Fecha:</label>
+                    <select id="orden-fecha" onchange="renderHistorial()">
+                        <option value="desc">Más recientes primero</option>
+                        <option value="asc">Más antiguos primero</option>
+                    </select>
+                </div>
+            </div>
+
+            <table id="tabla-historial">
+                <thead>
+                    <tr>
+                        <th>N° Venta</th>
+                        <th>Fecha y Hora</th>
+                        <th>Productos (Cantidad)</th>
+                        <th>Método Pago</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+    </main>
+
+    <script src="renderer.js"></script>
+</body>
+
+</html>
