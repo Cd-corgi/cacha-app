@@ -1,5 +1,5 @@
 {
-  "name": "cacha-app-pwa",
+  "name": "Cacha App",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -16,7 +16,8 @@
     "dexie-react-hooks": "^4.4.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "vite-plugin-pwa": "^2.0.0"
+    "vite-plugin-pwa": "^2.0.0",
+    "ws": "^8.22.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
